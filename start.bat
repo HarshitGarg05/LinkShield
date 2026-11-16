@@ -1,0 +1,3 @@
+@echo off
+echo [*] Starting Link Shield Backend & Frontend...
+npm start
