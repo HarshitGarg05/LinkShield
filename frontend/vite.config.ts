@@ -8,7 +8,6 @@ export default defineConfig({
     react(),
     tailwindcss(),
   ],
-  base: './', // Relative base for both custom domains, Cloudflare, and GitHub Pages
   server: {
     port: 5173,
     proxy: {

@@ -53,17 +53,16 @@ const SAMPLE_BLACKLIST = new Set([
 ]);
 
 export async function onRequestPost({ request }: { request: Request }): Promise<Response> {
+  const t0 = performance.now();
+  let body: any;
   try {
-    const t0 = performance.now();
-    let body: any;
-    try {
-      body = await request.json();
-    } catch {
-      return new Response(JSON.stringify({ error: 'Invalid JSON payload' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
-      });
-    }
+    body = await request.json();
+  } catch {
+    return new Response(JSON.stringify({ error: 'Invalid JSON payload' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
+    });
+  }
 
   const rawUrl = (body?.url || '').trim();
   if (!rawUrl) {
@@ -164,7 +163,6 @@ export async function onRequestPost({ request }: { request: Request }): Promise<
   let redirectCount = 0;
   let domPenalty = 0;
   let domSignal = '';
-  let finalParsed: URL = parsed;
 
   try {
     const pageProbe = await fetch(cleanUrl, {
@@ -180,6 +178,7 @@ export async function onRequestPost({ request }: { request: Request }): Promise<
     if (finalUrl !== cleanUrl) {
       redirectCount = 1;
     }
+    let finalParsed: URL = parsed;
     try {
       finalParsed = new URL(finalUrl);
     } catch {}
@@ -469,18 +468,6 @@ export async function onRequestPost({ request }: { request: Request }): Promise<
       'Access-Control-Allow-Origin': '*'
     }
   });
-  } catch (err: any) {
-    return new Response(JSON.stringify({
-      status: 'ERROR',
-      error: err?.message || 'Internal Edge Scanner Error'
-    }), {
-      status: 500,
-      headers: {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*'
-      }
-    });
-  }
 }
 
 export async function onRequestOptions(): Promise<Response> {

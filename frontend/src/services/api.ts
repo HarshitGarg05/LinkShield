@@ -39,9 +39,7 @@ export async function scanUrl(targetUrl: string, signal?: AbortSignal): Promise<
       throw err;
     }
     throw new ApiError(
-      API_BASE_URL
-        ? `Could not reach the Link Shield scanner at ${API_BASE_URL}. Please check your connection or CORS settings.`
-        : 'Could not connect to the Link Shield backend server. Please ensure the backend server is running.',
+      'Could not connect to the Link Shield backend server at http://localhost:8080. Please ensure the backend is running.',
       0
     );
   }
@@ -50,7 +48,7 @@ export async function scanUrl(targetUrl: string, signal?: AbortSignal): Promise<
   try {
     data = await response.json();
   } catch {
-    throw new ApiError(`Scanner service returned an unexpected response (Status: ${response.status}).`, response.status);
+    throw new ApiError('Received an unparseable response from the backend server.', response.status);
   }
 
   if (!response.ok) {
