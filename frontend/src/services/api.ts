@@ -45,10 +45,15 @@ export async function scanUrl(targetUrl: string, signal?: AbortSignal): Promise<
   }
 
   let data: any;
+  let rawText = '';
   try {
-    data = await response.json();
+    rawText = await response.text();
+    data = JSON.parse(rawText);
   } catch {
-    throw new ApiError('Received an unparseable response from the backend server.', response.status);
+    throw new ApiError(
+      rawText && rawText.length < 200 ? rawText : 'Received an unparseable response from the backend server.',
+      response.status
+    );
   }
 
   if (!response.ok) {
