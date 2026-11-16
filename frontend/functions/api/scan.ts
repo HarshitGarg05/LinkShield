@@ -31,10 +31,24 @@ const RISKY_TLDS = [
   '.loan', '.click', '.link', '.country', '.kim', '.science', '.party', '.rest'
 ];
 
-const POPULAR_BRANDS = [
-  'paypal', 'google', 'microsoft', 'apple', 'amazon', 'netflix',
-  'chase', 'wellsfargo', 'bankofamerica', 'facebook', 'instagram', 'whatsapp', 'github', 'bing'
-];
+const POPULAR_BRANDS: Record<string, { brand: string; primaryDomains: string[] }> = {
+  'paypal': { brand: 'PayPal', primaryDomains: ['paypal.com', 'paypal.me'] },
+  'google': { brand: 'Google', primaryDomains: ['google.com'] },
+  'microsoft': { brand: 'Microsoft', primaryDomains: ['microsoft.com', 'live.com', 'office.com', 'msn.com'] },
+  'apple': { brand: 'Apple', primaryDomains: ['apple.com', 'icloud.com'] },
+  'amazon': { brand: 'Amazon', primaryDomains: ['amazon.com'] },
+  'netflix': { brand: 'Netflix', primaryDomains: ['netflix.com'] },
+  'chase': { brand: 'Chase Bank', primaryDomains: ['chase.com'] },
+  'wellsfargo': { brand: 'Wells Fargo', primaryDomains: ['wellsfargo.com'] },
+  'bankofamerica': { brand: 'Bank of America', primaryDomains: ['bankofamerica.com'] },
+  'facebook': { brand: 'Facebook', primaryDomains: ['facebook.com', 'fb.com'] },
+  'instagram': { brand: 'Instagram', primaryDomains: ['instagram.com'] },
+  'whatsapp': { brand: 'WhatsApp', primaryDomains: ['whatsapp.com'] },
+  'github': { brand: 'GitHub', primaryDomains: ['github.com'] },
+  'bing': { brand: 'Bing', primaryDomains: ['bing.com'] },
+  'twitter': { brand: 'Twitter / X', primaryDomains: ['twitter.com', 'x.com'] },
+  'linkedin': { brand: 'LinkedIn', primaryDomains: ['linkedin.com'] }
+};
 
 const SUSPICIOUS_PATH_KEYWORDS = [
   'login', 'verify', 'update', 'account', 'suspended', 'banking',
@@ -105,21 +119,40 @@ export async function onRequestPost({ request }: { request: Request }): Promise<
     // 2. Blacklist check
     const isBlacklisted = SAMPLE_BLACKLIST.has(hostname) || Array.from(SAMPLE_BLACKLIST).some(bl => hostname.endsWith('.' + bl));
 
-    // 3. Typosquatting & Punycode check
+    // 3. Typosquatting, Combosquatting & Lookalike check
     let isTyposquat = false;
     let typoReason = '';
+    const parts = hostname.split('.');
+    const domainLabel = parts.length >= 2 ? parts[parts.length - 2] : parts[0];
+    const registeredDomain = parts.length >= 2 ? parts.slice(-2).join('.') : hostname;
+
     if (hostname.startsWith('xn--') || hostname.includes('.xn--')) {
       isTyposquat = true;
       typoReason = `Punycode IDN homoglyph syntax detected: '${hostname}'`;
     } else {
-      const parts = hostname.split('.');
-      const domainLabel = parts.length >= 2 ? parts[parts.length - 2] : parts[0];
-      for (const brand of POPULAR_BRANDS) {
-        if (domainLabel === brand) continue;
-        const dist = levenshteinDistance(domainLabel, brand);
-        if (dist >= 1 && dist <= 2 && Math.abs(domainLabel.length - brand.length) <= 2) {
+      for (const [key, info] of Object.entries(POPULAR_BRANDS)) {
+        // If the domain label matches the brand name exactly, check whether the registered domain is one of its verified official domains
+        if (domainLabel === key) {
+          if (!info.primaryDomains.includes(registeredDomain)) {
+            isTyposquat = true;
+            typoReason = `Domain '${registeredDomain}' uses the trademark brand '${info.brand}' on an unauthorized top-level extension (expected: ${info.primaryDomains.join(', ')}).`;
+            break;
+          }
+          continue;
+        }
+
+        // Levenshtein typosquatting check (e.g. instgram, paypa1, g00gle)
+        const dist = levenshteinDistance(domainLabel, key);
+        if (dist >= 1 && dist <= 2 && Math.abs(domainLabel.length - key.length) <= 2) {
           isTyposquat = true;
-          typoReason = `Target domain '${domainLabel}' is a typosquatted lookalike of '${brand}' (Levenshtein distance = ${dist}).`;
+          typoReason = `Target domain '${domainLabel}' is a typosquatted lookalike of '${info.brand}' (Levenshtein distance = ${dist}).`;
+          break;
+        }
+
+        // Combosquatting / brand substring embedding (e.g. instagram-login, verify-paypal)
+        if (domainLabel.includes(key) && !info.primaryDomains.includes(registeredDomain)) {
+          isTyposquat = true;
+          typoReason = `Target domain '${domainLabel}' embeds trademarked brand '${info.brand}' within an unofficial hostname.`;
           break;
         }
       }
